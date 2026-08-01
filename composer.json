@@ -1,0 +1,20 @@
+{
+  "name": "sugarmill/currency",
+  "version": "1.0.0",
+  "description": "Money formatting and parsing for integer minor units. 136 currencies with correct decimal exponents — including the twenty where dividing by 100 is wrong. Zero dependencies.",
+  "type": "library",
+  "license": "GPL-2.0-or-later",
+  "homepage": "https://github.com/sugarmill/currency",
+  "authors": [ { "name": "David Sherlock", "homepage": "https://arraypress.com/" } ],
+  "keywords": ["currency", "money", "iso-4217", "stripe", "formatting", "zero-decimal"],
+  "require": { "php": ">=8.5", "ext-mbstring": "*" },
+  "require-dev": { "phpunit/phpunit": "^13.0" },
+  "suggest": { "ext-intl": "Locale-aware formatting via format_localized()." },
+  "autoload": { "psr-4": { "SugarMill\\Currency\\": "src/" } },
+  "autoload-dev": { "psr-4": { "SugarMill\\Currency\\Tests\\": "tests/" } },
+  "scripts": { "test": "phpunit" },
+  "config": { "optimize-autoloader": true, "sort-packages": true, "preferred-install": "dist" },
+  "minimum-stability": "stable",
+  "prefer-stable": true,
+  "support": { "issues": "https://github.com/sugarmill/currency/issues", "source": "https://github.com/sugarmill/currency" }
+}
