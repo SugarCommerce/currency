@@ -2,7 +2,7 @@
 /**
  * Money and Currencies test suite.
  *
- * @package   SugarMill\Currency
+ * @package   Sugar\Currency
  * @copyright Copyright (c) 2026, ArrayPress Limited
  * @license   GPL-2.0-or-later
  * @since     1.0.0
@@ -10,13 +10,13 @@
 
 declare( strict_types=1 );
 
-namespace SugarMill\Currency\Tests;
+namespace Sugar\Currency\Tests;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
-use SugarMill\Currency\Currencies;
-use SugarMill\Currency\Money;
+use Sugar\Currency\Currencies;
+use Sugar\Currency\Money;
 
 final class MoneyTest extends TestCase {
 

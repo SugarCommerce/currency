@@ -27,13 +27,13 @@ PHP 8.5+ (`ext-intl` optional, for locale-aware formatting)
 ## Installation
 
 ```bash
-composer require sugarmill/currency
+composer require sugarcommerce/currency
 ```
 
 ## Usage
 
 ```php
-use SugarMill\Currency\Money;
+use Sugar\Currency\Money;
 
 Money::format( 4999, 'USD' );            // '$49.99'
 Money::format( 1000, 'JPY' );            // '¥1,000'
@@ -75,7 +75,7 @@ Money::allocate( 1000, 3 );        // [334, 333, 333] — remainder distributed,
 ### Metadata
 
 ```php
-use SugarMill\Currency\Currencies;
+use Sugar\Currency\Currencies;
 
 Currencies::decimals( 'BHD' );        // 3
 Currencies::symbol( 'GBP' );          // '£'
