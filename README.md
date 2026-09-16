@@ -33,7 +33,7 @@ composer require sugarcommerce/currency
 ## Usage
 
 ```php
-use Sugar\Currency\Money;
+use SugarCommerce\Currency\Money;
 
 Money::format( 4999, 'USD' );            // '$49.99'
 Money::format( 1000, 'JPY' );            // '¥1,000'
@@ -75,7 +75,7 @@ Money::allocate( 1000, 3 );        // [334, 333, 333] — remainder distributed,
 ### Metadata
 
 ```php
-use Sugar\Currency\Currencies;
+use SugarCommerce\Currency\Currencies;
 
 Currencies::decimals( 'BHD' );        // 3
 Currencies::symbol( 'GBP' );          // '£'
