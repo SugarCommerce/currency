@@ -74,6 +74,43 @@ final readonly class Money {
 	}
 
 	/**
+	 * Format an amount, dropping minor units when they are zero.
+	 *
+	 * `$49` rather than `$49.00`, but `$49.99` untouched. For the places a
+	 * price is being advertised rather than accounted for: a shop listing, a
+	 * button, a pricing table. Every one of those reads better without two
+	 * zeros nobody is going to pay.
+	 *
+	 * Never for a receipt, an invoice or a total. There the trailing zeros
+	 * are the point — they say the number is exact, and a receipt that reads
+	 * `$49` invites the question of what happened to the pennies.
+	 *
+	 * Currencies with no minor unit are unaffected, because there is nothing
+	 * to drop: ¥1,000 is already ¥1,000.
+	 *
+	 * @since 1.1.0
+	 *
+	 * @param int    $amount Amount in the smallest currency unit.
+	 * @param string $code   ISO-4217 code.
+	 *
+	 * @return string e.g. `$49`, `$49.99`, `¥1,000`.
+	 */
+	public static function format_compact( int $amount, string $code ): string {
+		$formatted = self::format( $amount, $code );
+		$digits     = Currencies::decimals( $code );
+
+		if ( 0 === $digits || 0 !== $amount % ( 10 ** $digits ) ) {
+			return $formatted;
+		}
+
+		// The fractional part is always at the end — every format this class
+		// produces puts the symbol, the code and the minus sign in front —
+		// so the separator and the zeros after it are the last $digits + 1
+		// characters, whatever the separator happens to be.
+		return substr( $formatted, 0, -( $digits + 1 ) );
+	}
+
+	/**
 	 * Format an amount with its code rather than its symbol.
 	 *
 	 * Unambiguous, which matters wherever several currencies appear

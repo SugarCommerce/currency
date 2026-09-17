@@ -36,6 +36,7 @@ composer require sugarcommerce/currency
 use SugarCommerce\Currency\Money;
 
 Money::format( 4999, 'USD' );            // '$49.99'
+Money::format_compact( 2900, 'GBP' );    // '£29' — for a price being advertised
 Money::format( 1000, 'JPY' );            // '¥1,000'
 Money::format( 1500, 'BHD' );            // 'BD 1.500'
 Money::format_with_code( 4999, 'USD' );  // '49.99 USD'

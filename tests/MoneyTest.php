@@ -22,6 +22,48 @@ final class MoneyTest extends TestCase {
 
 	/* ─── Dataset ───────────────────────────────────────────────────── */
 
+	/* ── advertising a price ─────────────────────────────────────────── */
+
+	/**
+	 * A shop listing reads better without two zeros nobody is going to pay.
+	 */
+	public function test_whole_amounts_lose_their_minor_units(): void {
+		$this->assertSame( '£29', Money::format_compact( 2900, 'GBP' ) );
+		$this->assertSame( '$49', Money::format_compact( 4900, 'USD' ) );
+	}
+
+	public function test_an_amount_with_pennies_keeps_them(): void {
+		$this->assertSame( '$49.99', Money::format_compact( 4999, 'USD' ) );
+		$this->assertSame( '£29.50', Money::format_compact( 2950, 'GBP' ) );
+	}
+
+	/**
+	 * Nothing to drop: the currency has no minor unit.
+	 */
+	public function test_a_zero_decimal_currency_is_untouched(): void {
+		$this->assertSame( Money::format( 100_000, 'JPY' ), Money::format_compact( 100_000, 'JPY' ) );
+	}
+
+	/**
+	 * Three decimal places, so "whole" means a multiple of a thousand.
+	 */
+	public function test_a_three_decimal_currency_counts_all_three(): void {
+		$this->assertSame( 'BD 2', Money::format_compact( 2000, 'BHD' ) );
+		$this->assertSame( 'BD 1.500', Money::format_compact( 1500, 'BHD' ) );
+	}
+
+	public function test_the_thousands_separator_survives(): void {
+		$this->assertSame( '$1,234', Money::format_compact( 123_400, 'USD' ) );
+	}
+
+	public function test_a_negative_amount_keeps_its_sign(): void {
+		$this->assertSame( '-£29', Money::format_compact( -2900, 'GBP' ) );
+	}
+
+	public function test_zero_is_zero(): void {
+		$this->assertSame( '$0', Money::format_compact( 0, 'USD' ) );
+	}
+
 	public function test_the_dataset_is_complete(): void {
 		$this->assertCount( 136, Currencies::all() );
 		$this->assertCount( 136, Currencies::codes() );
