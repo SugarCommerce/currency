@@ -1,6 +1,6 @@
 {
   "name": "sugarcommerce/currency",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Money formatting and parsing for integer minor units. 136 currencies with correct decimal exponents — including the twenty where dividing by 100 is wrong. Zero dependencies.",
   "type": "library",
   "license": "GPL-2.0-or-later",

@@ -324,7 +324,7 @@ final readonly class Money {
 	 * Either way the safe rule for an amount you will settle is the same:
 	 * make it a multiple of 100.
 	 */
-	private const HUNDRED_MULTIPLE = array( 'isk', 'ugx', 'huf', 'twd' );
+	private const array HUNDRED_MULTIPLE = array( 'isk', 'ugx', 'huf', 'twd' );
 
 	/**
 	 * Whether an amount is one the processor will accept.

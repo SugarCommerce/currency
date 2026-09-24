@@ -34,7 +34,7 @@ final readonly class Currencies {
 	 *
 	 * @var array<string, array{name: string, symbol: string, decimals: int, locale: string, country: string, country_name: string}>
 	 */
-	private const CURRENCIES = array(
+	private const array CURRENCIES = array(
 		'aed' => array( 'name' => 'United Arab Emirates Dirham', 'symbol' => 'د.إ', 'decimals' => 2, 'locale' => 'ar_AE', 'country' => 'AE', 'country_name' => 'United Arab Emirates' ),
 		'afn' => array( 'name' => 'Afghan Afghani', 'symbol' => '؋', 'decimals' => 2, 'locale' => 'fa_AF', 'country' => 'AF', 'country_name' => 'Afghanistan' ),
 		'all' => array( 'name' => 'Albanian Lek', 'symbol' => 'L', 'decimals' => 2, 'locale' => 'sq_AL', 'country' => 'AL', 'country_name' => 'Albania' ),
@@ -184,7 +184,7 @@ final readonly class Currencies {
 	 * A currency absent from this table has no published minimum; the
 	 * settlement currency's minimum applies after conversion.
 	 */
-	private const MINIMUM_CHARGE = array(
+	private const array MINIMUM_CHARGE = array(
 		'usd' => 50,    'aed' => 200,   'ars' => 50,    'aud' => 50,
 		'brl' => 50,    'cad' => 50,    'chf' => 50,    'cop' => 50,
 		'czk' => 1500,  'dkk' => 250,   'eur' => 50,    'gbp' => 30,
@@ -201,7 +201,7 @@ final readonly class Currencies {
 	 * Bounded by the digit count Stripe accepts, which differs for three
 	 * currencies. Card networks may impose lower limits of their own.
 	 */
-	private const MAXIMUM_CHARGE = array(
+	private const array MAXIMUM_CHARGE = array(
 		'idr' => 999999999999,
 		'cop' => 9999999999,
 		'inr' => 999999999,
@@ -210,7 +210,7 @@ final readonly class Currencies {
 	/**
 	 * Maximum charge for every other currency, in minor units.
 	 */
-	private const MAXIMUM_CHARGE_DEFAULT = 99999999;
+	private const int MAXIMUM_CHARGE_DEFAULT = 99999999;
 
 	/**
 	 * The smallest charge Stripe will accept.
