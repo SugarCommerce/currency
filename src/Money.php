@@ -160,6 +160,52 @@ final readonly class Money {
 	}
 
 	/**
+	 * Format for a price being advertised, the way a locale writes one.
+	 *
+	 * format_compact() for another language: "29 €" to a German reader
+	 * rather than "29,00 €", and "29,50 €" when there are cents to show.
+	 * It cannot be had by trimming format_localized()'s output, because
+	 * in many locales the symbol, not the fraction, is at the end.
+	 *
+	 * Requires ext-intl, and falls back to {@see self::format_compact()}
+	 * without it or when ICU cannot format the amount.
+	 *
+	 * @since 1.2.0
+	 *
+	 * @param int    $amount Amount in the smallest currency unit.
+	 * @param string $code   ISO-4217 code.
+	 * @param string $locale Locale tag, `pt-BR` or `pt_BR`.
+	 *
+	 * @return string e.g. `29 €`, `29,50 €`, `R$ 29`.
+	 */
+	public static function format_localized_compact( int $amount, string $code, string $locale ): string {
+		$code = strtoupper( trim( $code ) );
+
+		if ( ! class_exists( \NumberFormatter::class ) ) {
+			return self::format_compact( $amount, $code );
+		}
+
+		try {
+			$formatter = new \NumberFormatter( str_replace( '-', '_', trim( $locale ) ), \NumberFormatter::CURRENCY );
+		} catch ( \Throwable ) {
+			return self::format_compact( $amount, $code );
+		}
+
+		$digits = Currencies::decimals( $code );
+
+		// Whole amounts drop the fraction; anything else keeps every digit
+		// the currency has, so 29.50 never prints as 29.5.
+		if ( 0 === $amount % ( 10 ** $digits ) ) {
+			$formatter->setAttribute( \NumberFormatter::MIN_FRACTION_DIGITS, 0 );
+			$formatter->setAttribute( \NumberFormatter::MAX_FRACTION_DIGITS, 0 );
+		}
+
+		$result = $formatter->formatCurrency( self::to_float( $amount, $code ), $code );
+
+		return false === $result ? self::format_compact( $amount, $code ) : $result;
+	}
+
+	/**
 	 * The decimal string for an amount, without any symbol.
 	 *
 	 * Thousands-separated, with exactly as many decimal places as the

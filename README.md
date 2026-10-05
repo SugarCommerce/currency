@@ -37,6 +37,7 @@ use SugarCommerce\Currency\Money;
 
 Money::format( 4999, 'USD' );            // '$49.99'
 Money::format_compact( 2900, 'GBP' );    // '£29' — for a price being advertised
+Money::format_localized_compact( 2900, 'EUR', 'de' );   // '29 €' — the same, in a reader's language
 Money::format( 1000, 'JPY' );            // '¥1,000'
 Money::format( 1500, 'BHD' );            // 'BD 1.500'
 Money::format_with_code( 4999, 'USD' );  // '49.99 USD'
@@ -106,7 +107,7 @@ composer install
 composer test
 ```
 
-93 tests, 873 assertions — every exponent verified against ISO 4217 and Stripe's published tables, plus allocation invariants (the parts always sum to the whole) and the hostile-input cases.
+110 tests, 895 assertions — every exponent verified against ISO 4217 and Stripe's published tables, plus allocation invariants (the parts always sum to the whole) and the hostile-input cases, and localised advertised prices in four locales.
 
 ## License
 

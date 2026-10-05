@@ -386,4 +386,47 @@ final class MoneyTest extends TestCase {
 		$this->assertStringContainsString( '$', $options['USD'] );
 		$this->assertSame( array_values( $options ), array_values( $options ) );
 	}
+
+	/* ─── Localised compact ─────────────────────────────────────────── */
+
+	/**
+	 * @return array<string, array{0: int, 1: string, 2: string, 3: string}>
+	 */
+	public static function localised_compact(): array {
+		return array(
+			'a whole euro price in German'    => array( 2900, 'EUR', 'de', "29\u{a0}€" ),
+			'euro cents in German'            => array( 2950, 'EUR', 'de', "29,50\u{a0}€" ),
+			'a hyphenated tag'                => array( 2900, 'BRL', 'pt-BR', "R$\u{a0}29" ),
+			'an ICU tag'                      => array( 2900, 'BRL', 'pt_BR', "R$\u{a0}29" ),
+			'a lower-case code'               => array( 2900, 'eur', 'de', "29\u{a0}€" ),
+			'a negative amount'               => array( -2900, 'EUR', 'de', "-29\u{a0}€" ),
+			'a three-decimal currency in full' => array( 1500, 'BHD', 'en', "BHD\u{a0}1.500" ),
+		);
+	}
+
+	#[DataProvider( 'localised_compact' )]
+	#[RequiresPhpExtension( 'intl' )]
+	public function test_an_advertised_price_reads_the_way_its_locale_writes_one( int $amount, string $code, string $locale, string $expected ): void {
+		$this->assertSame( $expected, Money::format_localized_compact( $amount, $code, $locale ) );
+	}
+
+	/**
+	 * Trimming the localised receipt format cannot produce this: in German
+	 * the fraction is in the middle.
+	 */
+	#[RequiresPhpExtension( 'intl' )]
+	public function test_only_whole_amounts_lose_their_fraction(): void {
+		$this->assertStringNotContainsString( ',00', Money::format_localized_compact( 2900, 'EUR', 'de' ) );
+		$this->assertStringContainsString( ',00', Money::format_localized( 2900, 'EUR', 'de' ) );
+	}
+
+	#[RequiresPhpExtension( 'intl' )]
+	public function test_a_zero_decimal_currency_keeps_its_digits(): void {
+		$this->assertStringContainsString( '100,000', Money::format_localized_compact( 100_000, 'JPY', 'ja' ) );
+	}
+
+	public function test_an_unusable_locale_still_prints_the_price(): void {
+		$this->assertStringContainsString( '29', Money::format_localized_compact( 2900, 'EUR', '' ) );
+		$this->assertStringNotContainsString( '.00', Money::format_localized_compact( 2900, 'EUR', '' ) );
+	}
 }
