@@ -202,11 +202,12 @@ final class MoneyTest extends TestCase {
 			'comma decimal'     => array( '49,99', 'USD', 4999 ),
 			'whole number'      => array( '50', 'USD', 5000 ),
 			'one decimal'       => array( '49.9', 'USD', 4990 ),
-			'excess decimals'   => array( '49.999', 'USD', 4999 ),
+			'trailing zeros'    => array( '49.990', 'USD', 4999 ),
 			'negative'          => array( '-49.99', 'USD', -4999 ),
 			'zero decimal'      => array( '1000', 'JPY', 1000 ),
 			'zero decimal sep'  => array( '1,000', 'JPY', 1000 ),
 			'three decimal'     => array( '1.500', 'BHD', 1500 ),
+			'zero decimal .00'  => array( '100.00', 'JPY', 100 ),
 			'empty'             => array( '', 'USD', 0 ),
 			'no digits'         => array( 'abc', 'USD', 0 ),
 		);

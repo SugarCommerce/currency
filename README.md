@@ -52,9 +52,12 @@ Money::parse( '$1,234.56', 'USD' );   // 123456
 Money::parse( '€1.234,56', 'EUR' );   // 123456
 Money::parse( '1000', 'JPY' );        // 1000
 Money::parse( 'nonsense', 'USD' );    // 0
+Money::parse( '1.230', 'USD' );       // 123 — trailing zeros are fine
+Money::parse( '1.234', 'USD' );       // throws — finer than a cent
+Money::parse( '100.5', 'JPY' );       // throws — JPY has no minor unit
 ```
 
-Throws `InvalidArgumentException` for an amount too large to hold in an integer — a twenty-digit figure typed into a price field. Clamping it silently would be worse.
+Throws `InvalidArgumentException` for an amount too large to hold in an integer — a twenty-digit figure typed into a price field — and for one with more decimal places than the currency has minor units. `1.234` is not a dollar amount, and truncating it to $1.23 (or rounding ¥100.5 to ¥101) would store a price nobody typed. Clamping or rounding silently would be worse.
 
 ### Validating an amount
 

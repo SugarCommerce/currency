@@ -175,8 +175,52 @@ final class MoneySecurityTest extends TestCase {
 	public function test_large_amounts_parse_exactly(): void {
 		$this->assertSame( 9007199254740993123, Money::parse( '90071992547409931.23', 'USD' ) );
 		$this->assertSame( PHP_INT_MAX - 1, Money::parse( (string) ( PHP_INT_MAX - 1 ), 'JPY' ) );
-		$this->assertSame( 1235, Money::parse( '1,234.5', 'JPY' ) );
-		$this->assertSame( 1234, Money::parse( '1234.49', 'JPY' ) );
+		$this->assertSame( 1234, Money::parse( '1,234.00', 'JPY' ) );
+	}
+
+	/**
+	 * A fraction finer than the currency's minor unit was truncated —
+	 * `1.234` USD became 123 — and a zero-decimal currency rounded half
+	 * up. Either way the stored price was not the one typed.
+	 */
+	#[DataProvider( 'excess_decimals' )]
+	public function test_an_amount_finer_than_the_minor_unit_is_refused( string $input, string $code ): void {
+		$this->expectException( InvalidArgumentException::class );
+		$this->expectExceptionMessage( 'more decimal places than the currency allows' );
+
+		Money::parse( $input, $code );
+	}
+
+	/**
+	 * @return array<string, array{0: string, 1: string}>
+	 */
+	public static function excess_decimals(): array {
+		return array(
+			'two decimal, three given'   => array( '1.234', 'USD' ),
+			'two decimal, rounds up'     => array( '49.999', 'USD' ),
+			'two decimal, negative'      => array( '-1.234', 'USD' ),
+			'two decimal, european'      => array( '1.234,567', 'EUR' ),
+			'two decimal, nonzero after' => array( '1.2301', 'USD' ),
+			'zero decimal, half'         => array( '100.5', 'JPY' ),
+			'zero decimal, under half'   => array( '1234.49', 'JPY' ),
+			'zero decimal, grouped'      => array( '1,234.5', 'JPY' ),
+			'zero decimal, trailing'     => array( '100.01', 'JPY' ),
+			'three decimal, four given'  => array( '1.5001', 'BHD' ),
+		);
+	}
+
+	/**
+	 * Zeros past the exponent do not change the amount, so they are not
+	 * a reason to refuse it.
+	 */
+	public function test_trailing_zeros_past_the_minor_unit_are_accepted(): void {
+		$this->assertSame( 123, Money::parse( '1.230', 'USD' ) );
+		$this->assertSame( 123, Money::parse( '1.23000', 'USD' ) );
+		$this->assertSame( 100, Money::parse( '100.00', 'JPY' ) );
+		$this->assertSame( 100, Money::parse( '100.', 'JPY' ) );
+		$this->assertSame( 1500, Money::parse( '1.5000', 'BHD' ) );
+		$this->assertSame( 4999, Money::parse( '49.99', 'USD' ) );
+		$this->assertSame( 4990, Money::parse( '49.9', 'USD' ) );
 	}
 
 	public function test_the_smallest_integer_formats_rather_than_throwing(): void {

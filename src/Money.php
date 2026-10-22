@@ -281,7 +281,14 @@ final readonly class Money {
 	 * separators, and either decimal convention — `€1.234,56` and
 	 * `$1,234.56` both mean the same amount.
 	 *
+	 * An amount finer than the currency's minor unit is refused, not
+	 * truncated or rounded: `1.234` is not a dollar amount, and quietly
+	 * charging $1.23 for it is a different price from the one typed.
+	 * Trailing zeros past the exponent change nothing and are accepted —
+	 * `1.230` USD is 123, `100.00` JPY is 100, `100.5` JPY is refused.
+	 *
 	 * @since 1.0.0
+	 * @since 1.3.0 Refuses excess decimals instead of truncating them.
 	 *
 	 * @param string $input Raw input.
 	 * @param string $code  ISO-4217 code.
@@ -290,11 +297,14 @@ final readonly class Money {
 	 *             numeric was present.
 	 *
 	 * @throws \InvalidArgumentException When the amount is too large to
-	 *                                   hold in an integer. This method
+	 *                                   hold in an integer, or has more
+	 *                                   decimal places than the currency
+	 *                                   has minor units. This method
 	 *                                   reads form input, so callers
 	 *                                   should expect it — silently
-	 *                                   clamping a money value would be
-	 *                                   worse than refusing it.
+	 *                                   clamping or rounding a money
+	 *                                   value would be worse than
+	 *                                   refusing it.
 	 */
 	public static function parse( string $input, string $code ): int {
 		$decimals = Currencies::decimals( $code );
@@ -318,16 +328,15 @@ final readonly class Money {
 		$major = (string) preg_replace( '/\D/', '', $parts[0] );
 		$tail  = (string) preg_replace( '/\D/', '', $parts[1] ?? '' );
 
-		// Pad or truncate the fraction to the currency's exponent rather
-		// than trusting the input to have the right number of digits.
-		$fraction = substr( str_pad( $tail, $decimals, '0' ), 0, $decimals );
-		$amount   = self::digits_to_int( $major . $fraction );
-
-		// A currency with no minor unit rounds half up on the first
-		// dropped digit, as it always has.
-		if ( 0 === $decimals && '' !== $tail && (int) $tail[0] >= 5 ) {
-			$amount = self::to_int( $amount + 1 );
+		// Digits past the currency's exponent must all be zero. Anything
+		// else is a price the currency cannot express, and truncating or
+		// rounding it would charge an amount nobody typed.
+		if ( '' !== trim( substr( $tail, $decimals ), '0' ) ) {
+			throw new \InvalidArgumentException( 'That amount has more decimal places than the currency allows.' );
 		}
+
+		$fraction = str_pad( substr( $tail, 0, $decimals ), $decimals, '0' );
+		$amount   = self::digits_to_int( $major . $fraction );
 
 		return $negative ? -$amount : $amount;
 	}
