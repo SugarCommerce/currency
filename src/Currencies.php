@@ -298,7 +298,7 @@ final readonly class Currencies {
 	public static function sanitize_code( string $code ): string {
 		$code = strtoupper( trim( $code ) );
 
-		return 1 === preg_match( '/^[A-Z]{3}$/', $code ) ? $code : '';
+		return 1 === preg_match( '/^[A-Z]{3}$/D', $code ) ? $code : '';
 	}
 
 	/**
