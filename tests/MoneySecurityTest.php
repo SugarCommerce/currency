@@ -14,6 +14,7 @@ namespace SugarCommerce\Currency\Tests;
 
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
 use SugarCommerce\Currency\Currencies;
 use SugarCommerce\Currency\Money;
@@ -128,5 +129,98 @@ final class MoneySecurityTest extends TestCase {
 				$this->addToAssertionCount( 1 );
 			}
 		}
+	}
+
+	/* ─── Hardening, 1.3.0 ──────────────────────────────────────────── */
+
+	/**
+	 * ICU prints an unknown currency code as the symbol, so a hostile code
+	 * reached the page through the localised formatters.
+	 */
+	#[RequiresPhpExtension( 'intl' )]
+	#[DataProvider( 'hostile_codes' )]
+	public function test_localised_formats_never_echo_a_hostile_code( string $code ): void {
+		foreach ( array( Money::format_localized( 100, $code, 'en_US' ), Money::format_localized_compact( 100, $code, 'en_US' ) ) as $rendered ) {
+			$this->assertStringNotContainsString( '<', $rendered );
+			$this->assertStringNotContainsString( '"', $rendered );
+			$this->assertStringNotContainsString( '>', $rendered );
+		}
+	}
+
+	/**
+	 * The reason is written to be shown to the shopper, and the code is
+	 * usually theirs.
+	 */
+	public function test_the_unsupported_currency_message_never_echoes_markup(): void {
+		$reason = (string) Money::why_not_chargeable( 100, '<script>alert(1)</script>' );
+
+		$this->assertStringNotContainsString( '<', $reason );
+		$this->assertStringContainsString( 'not a supported currency', $reason );
+		$this->assertSame( 'XYZ is not a supported currency.', Money::why_not_chargeable( 100, 'xyz' ) );
+	}
+
+	/**
+	 * A locale from an Accept-Language header that ICU refuses fell
+	 * through as an uncaught IntlException.
+	 */
+	#[RequiresPhpExtension( 'intl' )]
+	public function test_an_unusable_locale_falls_back_rather_than_throwing(): void {
+		$this->assertSame( '$1.00', Money::format_localized( 100, 'USD', str_repeat( 'x', 200 ) ) );
+	}
+
+	/**
+	 * Above 2^53 the major part was read through a float and came back as
+	 * a different, plausible amount instead of failing.
+	 */
+	public function test_large_amounts_parse_exactly(): void {
+		$this->assertSame( 9007199254740993123, Money::parse( '90071992547409931.23', 'USD' ) );
+		$this->assertSame( PHP_INT_MAX - 1, Money::parse( (string) ( PHP_INT_MAX - 1 ), 'JPY' ) );
+		$this->assertSame( 1235, Money::parse( '1,234.5', 'JPY' ) );
+		$this->assertSame( 1234, Money::parse( '1234.49', 'JPY' ) );
+	}
+
+	public function test_the_smallest_integer_formats_rather_than_throwing(): void {
+		$this->assertSame( '-$92,233,720,368,547,758.08', Money::format( PHP_INT_MIN, 'USD' ) );
+		$this->assertSame( '-BD 0.005', Money::format( -5, 'BHD' ) );
+	}
+
+	/**
+	 * 17.5% of 180 is exactly 31.5. Float arithmetic made it 31.499… and
+	 * rounded it down, so "half up" was not.
+	 */
+	public function test_percentages_round_exact_ties_up(): void {
+		$this->assertSame( 32, Money::percentage( 180, 17.5 ) );
+		$this->assertSame( -32, Money::percentage( -180, 17.5 ) );
+		$this->assertSame( 89, Money::percentage( 1000, 8.875 ) );
+		$this->assertSame( 92233720368547758, Money::percentage( PHP_INT_MAX, 1.0 ) );
+	}
+
+	/**
+	 * An overflowing or non-finite percentage used to warn and return 0 —
+	 * a free order rather than an error.
+	 */
+	#[DataProvider( 'unrepresentable_percentages' )]
+	public function test_an_unrepresentable_percentage_is_refused( int $amount, float $percent ): void {
+		$this->expectException( InvalidArgumentException::class );
+
+		Money::percentage( $amount, $percent );
+	}
+
+	/**
+	 * @return array<string, array{0: int, 1: float}>
+	 */
+	public static function unrepresentable_percentages(): array {
+		return array(
+			'overflow'      => array( PHP_INT_MAX, 200.0 ),
+			'huge rate'     => array( PHP_INT_MAX, 1e9 ),
+			'not a number'  => array( 100, NAN ),
+			'infinite'      => array( 100, INF ),
+		);
+	}
+
+	public function test_rounding_to_a_valid_increment_is_exact_for_large_amounts(): void {
+		$this->assertSame( 9007199254741000, Money::round_to_valid( 9007199254740993, 'ISK' ) );
+		$this->assertSame( -600, Money::round_to_valid( -550, 'ISK' ) );
+		$this->assertSame( -500, Money::round_to_valid( -549, 'ISK' ) );
 	}
 }

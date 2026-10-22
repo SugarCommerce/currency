@@ -245,7 +245,7 @@ final readonly class Currencies {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @return array<string, array<string, mixed>>
+	 * @return array<string, array{name: string, symbol: string, decimals: int, locale: string, country: string, country_name: string}>
 	 */
 	public static function all(): array {
 		return self::CURRENCIES;
@@ -256,7 +256,7 @@ final readonly class Currencies {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @return string[]
+	 * @return list<string>
 	 */
 	public static function codes(): array {
 		return array_map( 'strtoupper', array_keys( self::CURRENCIES ) );
@@ -269,7 +269,8 @@ final readonly class Currencies {
 	 *
 	 * @param string $code ISO-4217 code, any case.
 	 *
-	 * @return array<string, mixed>|null Null when unsupported.
+	 * @return array{name: string, symbol: string, decimals: int, locale: string, country: string, country_name: string}|null
+	 *         Null when unsupported.
 	 */
 	public static function get( string $code ): ?array {
 		return self::CURRENCIES[ strtolower( trim( $code ) ) ] ?? null;
@@ -394,7 +395,7 @@ final readonly class Currencies {
 	 *
 	 * @param string $country_code ISO 3166-1 alpha-2 code.
 	 *
-	 * @return string[] Uppercase currency codes.
+	 * @return list<string> Uppercase currency codes.
 	 */
 	public static function for_country( string $country_code ): array {
 		$country = strtoupper( trim( $country_code ) );

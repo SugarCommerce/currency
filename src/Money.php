@@ -137,7 +137,13 @@ final readonly class Money {
 	 *
 	 * Places the symbol and separators the way the target locale expects
 	 * — `1 234,56 €` in French, `€1,234.56` in English. Requires ext-intl
-	 * and falls back to {@see self::format()} without it.
+	 * and falls back to {@see self::format()} without it, for a code that
+	 * is not three letters, or for a locale ICU refuses.
+	 *
+	 * The locale may come straight from an `Accept-Language` header: one
+	 * ICU cannot use falls back rather than throwing. The code is checked
+	 * before ICU sees it, because ICU prints an unknown code as the
+	 * symbol and would otherwise echo `"><` into the page.
 	 *
 	 * @since 1.0.0
 	 *
@@ -148,13 +154,21 @@ final readonly class Money {
 	 * @return string
 	 */
 	public static function format_localized( int $amount, string $code, string $locale = '' ): string {
-		if ( ! class_exists( \NumberFormatter::class ) ) {
+		$safe = Currencies::sanitize_code( $code );
+
+		if ( '' === $safe || ! class_exists( \NumberFormatter::class ) ) {
 			return self::format( $amount, $code );
 		}
 
-		$locale    = '' !== $locale ? $locale : Currencies::locale( $code );
-		$formatter = new \NumberFormatter( $locale, \NumberFormatter::CURRENCY );
-		$result    = $formatter->formatCurrency( self::to_float( $amount, $code ), strtoupper( trim( $code ) ) );
+		$locale = '' !== $locale ? $locale : Currencies::locale( $code );
+
+		try {
+			$formatter = new \NumberFormatter( $locale, \NumberFormatter::CURRENCY );
+		} catch ( \Throwable ) {
+			return self::format( $amount, $code );
+		}
+
+		$result = $formatter->formatCurrency( self::to_float( $amount, $code ), $safe );
 
 		return false === $result ? self::format( $amount, $code ) : $result;
 	}
@@ -168,7 +182,8 @@ final readonly class Money {
 	 * in many locales the symbol, not the fraction, is at the end.
 	 *
 	 * Requires ext-intl, and falls back to {@see self::format_compact()}
-	 * without it or when ICU cannot format the amount.
+	 * without it, for a code that is not three letters, or when ICU
+	 * cannot format the amount.
 	 *
 	 * @since 1.2.0
 	 *
@@ -179,9 +194,11 @@ final readonly class Money {
 	 * @return string e.g. `29 €`, `29,50 €`, `R$ 29`.
 	 */
 	public static function format_localized_compact( int $amount, string $code, string $locale ): string {
-		$code = strtoupper( trim( $code ) );
+		$code = Currencies::sanitize_code( $code );
 
-		if ( ! class_exists( \NumberFormatter::class ) ) {
+		// ICU prints an unknown code as the symbol, so only a well-formed
+		// one is handed over; see format_localized().
+		if ( '' === $code || ! class_exists( \NumberFormatter::class ) ) {
 			return self::format_compact( $amount, $code );
 		}
 
@@ -225,16 +242,17 @@ final readonly class Money {
 			return number_format( $amount );
 		}
 
-		$divisor  = 10 ** $decimals;
 		$negative = $amount < 0;
-		$absolute = abs( $amount );
 
-		// Integer arithmetic throughout — converting to float here is
-		// what reintroduces the rounding error this class avoids.
-		$major = intdiv( $absolute, $divisor );
-		$minor = $absolute % $divisor;
+		// Split the digits as a string rather than dividing. Converting to
+		// float is what reintroduces the rounding error this class avoids,
+		// and abs( PHP_INT_MIN ) is itself a float, so even integer
+		// division cannot start from the absolute value.
+		$digits = str_pad( ltrim( (string) $amount, '-' ), $decimals + 1, '0', STR_PAD_LEFT );
+		$major  = (int) substr( $digits, 0, -$decimals );
+		$minor  = substr( $digits, -$decimals );
 
-		$rendered = number_format( $major ) . '.' . str_pad( (string) $minor, $decimals, '0', STR_PAD_LEFT );
+		$rendered = number_format( $major ) . '.' . $minor;
 
 		return $negative ? '-' . $rendered : $rendered;
 	}
@@ -291,23 +309,55 @@ final readonly class Money {
 		}
 
 		$clean = self::normalize_separators( $clean, $decimals );
-
-		if ( 0 === $decimals ) {
-			$amount = self::to_int( round( (float) $clean ) );
-
-			return $negative ? -$amount : $amount;
-		}
-
 		$parts = explode( '.', $clean, 2 );
-		$major = self::to_int( (float) ( '' === $parts[0] ? '0' : $parts[0] ) );
+
+		// Digits only on both sides. The major part is never routed
+		// through a float: above 2^53 a float silently drops the last
+		// digits, so a large figure would parse to a different amount
+		// rather than failing.
+		$major = (string) preg_replace( '/\D/', '', $parts[0] );
+		$tail  = (string) preg_replace( '/\D/', '', $parts[1] ?? '' );
 
 		// Pad or truncate the fraction to the currency's exponent rather
 		// than trusting the input to have the right number of digits.
-		$fraction = substr( str_pad( $parts[1] ?? '', $decimals, '0' ), 0, $decimals );
+		$fraction = substr( str_pad( $tail, $decimals, '0' ), 0, $decimals );
+		$amount   = self::digits_to_int( $major . $fraction );
 
-		$amount = self::to_int( $major * ( 10 ** $decimals ) + (int) ( '' === $fraction ? '0' : $fraction ) );
+		// A currency with no minor unit rounds half up on the first
+		// dropped digit, as it always has.
+		if ( 0 === $decimals && '' !== $tail && (int) $tail[0] >= 5 ) {
+			$amount = self::to_int( $amount + 1 );
+		}
 
 		return $negative ? -$amount : $amount;
+	}
+
+	/**
+	 * Read a run of decimal digits as an integer, exactly.
+	 *
+	 * @since 1.3.0
+	 *
+	 * @param string $digits Decimal digits only; '' reads as zero.
+	 *
+	 * @return int Non-negative.
+	 *
+	 * @throws \InvalidArgumentException When the value reaches PHP_INT_MAX.
+	 */
+	private static function digits_to_int( string $digits ): int {
+		$digits = ltrim( $digits, '0' );
+
+		if ( '' === $digits ) {
+			return 0;
+		}
+
+		$max = (string) PHP_INT_MAX;
+
+		// At equal length a lexical comparison is a numeric one.
+		if ( strlen( $digits ) > strlen( $max ) || ( strlen( $digits ) === strlen( $max ) && strcmp( $digits, $max ) >= 0 ) ) {
+			throw new \InvalidArgumentException( 'That amount is larger than this system can represent.' );
+		}
+
+		return (int) $digits;
 	}
 
 	/**
@@ -421,8 +471,13 @@ final readonly class Money {
 	public static function why_not_chargeable( int $amount, string $code ): ?string {
 		$upper = strtoupper( trim( $code ) );
 
+		// The code is usually caller-supplied and the message is meant to
+		// be shown, so an unrecognised one is echoed only when it is three
+		// plain letters.
 		if ( ! Currencies::supports( $code ) ) {
-			return $upper . ' is not a supported currency.';
+			$safe = Currencies::sanitize_code( $code );
+
+			return '' === $safe ? 'That is not a supported currency.' : $safe . ' is not a supported currency.';
 		}
 
 		if ( $amount < 0 ) {
@@ -465,17 +520,34 @@ final readonly class Money {
 	/**
 	 * Round an amount to something the processor will accept.
 	 *
+	 * Rounds half away from zero, in integer arithmetic so an amount
+	 * beyond 2^53 is not nudged by float rounding.
+	 *
 	 * @since 1.0.0
 	 *
 	 * @param int    $amount Amount in the smallest currency unit.
 	 * @param string $code   ISO-4217 code.
 	 *
 	 * @return int
+	 *
+	 * @throws \InvalidArgumentException When rounding up would pass the
+	 *                                   integer range.
 	 */
 	public static function round_to_valid( int $amount, string $code ): int {
 		$increment = self::increment( $code );
+		$remainder = $amount % $increment;
 
-		return 1 === $increment ? $amount : (int) ( round( $amount / $increment ) * $increment );
+		if ( 0 === $remainder ) {
+			return $amount;
+		}
+
+		$down = $amount - $remainder;
+
+		if ( 2 * abs( $remainder ) < $increment ) {
+			return $down;
+		}
+
+		return self::to_int( $down + ( $amount < 0 ? -$increment : $increment ) );
 	}
 
 	/**
@@ -506,14 +578,58 @@ final readonly class Money {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param int   $amount  Amount in the smallest currency unit.
-	 * @param float $percent Percentage, e.g. 20.0 for 20%.
+	 * The arithmetic is integer. The percentage is read to six decimal
+	 * places and the product is rounded exactly, because a float product
+	 * misses ties: 17.5% of 180 is 31.5, which float arithmetic computes
+	 * as 31.499… and rounds to 31.
 	 *
-	 * @return int
+	 * @param int   $amount  Amount in the smallest currency unit.
+	 * @param float $percent Percentage, e.g. 20.0 for 20%. Read to six
+	 *                       decimal places.
+	 *
+	 * @return int Rounded half away from zero.
+	 *
+	 * @throws \InvalidArgumentException When the percentage is not finite or
+	 *                                   the result is outside integer range.
 	 */
 	public static function percentage( int $amount, float $percent ): int {
-		return (int) round( $amount * ( $percent / 100 ) );
+		if ( ! is_finite( $percent ) ) {
+			throw new \InvalidArgumentException( 'A percentage must be a finite number.' );
+		}
+
+		$scaled = round( $percent * self::PERCENT_SCALE );
+
+		// Beyond 10,000% the remainder × rate product below could pass
+		// PHP_INT_MAX. Rates that size are not discounts or tax, so they
+		// take the float path, which is still range-checked.
+		if ( abs( $scaled ) >= self::PERCENT_SCALE * 10_000 ) {
+			return self::to_int( round( $amount * $percent / 100 ) );
+		}
+
+		$rate        = (int) $scaled;
+		$denominator = 100 * self::PERCENT_SCALE;
+
+		// amount × rate ÷ denominator without overflowing the product:
+		// the whole multiples of the denominator are multiplied directly,
+		// and only the remainder (below 10^8) meets the rate.
+		$whole     = intdiv( $amount, $denominator );
+		$remainder = $amount % $denominator;
+		$product   = $remainder * $rate;
+		$result    = self::to_int( $whole * $rate ) + intdiv( $product, $denominator );
+		$dropped   = $product % $denominator;
+
+		if ( 2 * abs( $dropped ) >= $denominator ) {
+			$result += $product < 0 ? -1 : 1;
+		}
+
+		return self::to_int( $result );
 	}
+
+	/**
+	 * Decimal places of a percentage that {@see self::percentage()}
+	 * honours, as a power of ten.
+	 */
+	private const int PERCENT_SCALE = 1_000_000;
 
 	/**
 	 * Split an amount into shares that still sum to the original.
@@ -528,7 +644,7 @@ final readonly class Money {
 	 * @param int $amount Amount in the smallest currency unit.
 	 * @param int $parts  How many shares.
 	 *
-	 * @return int[] Shares summing exactly to `$amount`.
+	 * @return list<int> Shares summing exactly to `$amount`.
 	 *
 	 * @throws \InvalidArgumentException When asked for fewer than one share.
 	 */
@@ -539,10 +655,12 @@ final readonly class Money {
 
 		$base      = intdiv( $amount, $parts );
 		$remainder = $amount - ( $base * $parts );
-		$shares    = array_fill( 0, $parts, $base );
+		$extra     = abs( $remainder );
+		$step      = $remainder > 0 ? 1 : -1;
+		$shares    = array();
 
-		for ( $i = 0; $i < abs( $remainder ); $i++ ) {
-			$shares[ $i ] += $remainder > 0 ? 1 : -1;
+		for ( $i = 0; $i < $parts; $i++ ) {
+			$shares[] = $i < $extra ? $base + $step : $base;
 		}
 
 		return $shares;
